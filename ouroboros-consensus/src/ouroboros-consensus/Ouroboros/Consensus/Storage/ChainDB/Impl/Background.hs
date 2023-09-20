@@ -54,6 +54,7 @@ import           Ouroboros.Consensus.Block
 import           Ouroboros.Consensus.Config
 import           Ouroboros.Consensus.HardFork.Abstract
 import           Ouroboros.Consensus.Ledger.Abstract
+import           Ouroboros.Consensus.Ledger.Extended
 import           Ouroboros.Consensus.Ledger.Inspect
 import           Ouroboros.Consensus.Ledger.SupportsProtocol
 import           Ouroboros.Consensus.Protocol.Abstract
@@ -89,12 +90,13 @@ launchBgTasks
      , HasHardForkHistory blk
      , LgrDbSerialiseConstraints blk
      )
-  => ChainDbEnv m blk
+  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  -> ChainDbEnv m blk
   -> Word64 -- ^ Number of immutable blocks replayed on ledger DB startup
   -> m ()
-launchBgTasks cdb@CDB{..} replayed = do
+launchBgTasks handleLedgerEvent cdb@CDB{..} replayed = do
     !addBlockThread <- launch "ChainDB.addBlockRunner" $
-      addBlockRunner cdb
+      addBlockRunner handleLedgerEvent cdb
     gcSchedule <- newGcSchedule
     !gcThread <- launch "ChainDB.gcScheduleRunner" $
       gcScheduleRunner gcSchedule $ garbageCollect cdb
@@ -528,9 +530,10 @@ addBlockRunner
      , HasHardForkHistory blk
      , HasCallStack
      )
-  => ChainDbEnv m blk
+  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  -> ChainDbEnv m blk
   -> m Void
-addBlockRunner cdb@CDB{..} = forever $ do
+addBlockRunner handleLedgerEvent cdb@CDB{..} = forever $ do
     let trace = traceWith cdbTracer . TraceAddBlockEvent
     trace $ PoppedBlockFromQueue RisingEdge
     -- if the `addBlockSync` does not complete because it was killed by an async
@@ -545,4 +548,4 @@ addBlockRunner cdb@CDB{..} = forever $ do
                    (\blkToAdd -> do
                      trace $ PoppedBlockFromQueue $ FallingEdgeWith $
                              blockRealPoint $ blockToAdd blkToAdd
-                     addBlockSync cdb blkToAdd)
+                     addBlockSync handleLedgerEvent cdb blkToAdd)
