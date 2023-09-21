@@ -192,7 +192,7 @@ initialChainSelection immutableDB volatileDB lgrDB tracer cfg varInvalid
                     candidates) $
         assert (all (preferAnchoredCandidate bcfg curChain) candidates) $ do
           cse <- chainSelEnv
-          chainSelection (const $ pure ()) cse (Diff.extend <$> candidates)
+          chainSelection discardEvent cse (Diff.extend <$> candidates)
       where
         curChain = VF.validatedFragment curChainAndLedger
         ledger   = VF.validatedLedger   curChainAndLedger
@@ -263,7 +263,7 @@ addBlockSync
      , HasHardForkHistory blk
      , HasCallStack
      )
-  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  => LedgerEventHandler m (ExtLedgerState blk)
   -> ChainDbEnv m blk
   -> BlockToAdd m blk
   -> m ()
@@ -405,7 +405,7 @@ chainSelectionForFutureBlocks cdb@CDB{..} blockCache = do
       return $ Map.elems futureBlocks
     forM_ futureBlockHeaders $ \(hdr, punish) -> do
       traceWith tracer $ ChainSelectionForFutureBlock (headerRealPoint hdr)
-      chainSelectionForBlock (const $ pure ()) cdb blockCache hdr punish
+      chainSelectionForBlock discardEvent cdb blockCache hdr punish
     atomically $ Query.getTipPoint cdb
   where
     tracer = TraceAddBlockEvent >$< cdbTracer
@@ -450,7 +450,7 @@ chainSelectionForBlock
      , HasHardForkHistory blk
      , HasCallStack
      )
-  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  => LedgerEventHandler m (ExtLedgerState blk)
   -> ChainDbEnv m blk
   -> BlockCache blk
   -> Header blk
@@ -883,7 +883,7 @@ chainSelection
      , LedgerSupportsProtocol blk
      , HasCallStack
      )
-  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  => LedgerEventHandler m (ExtLedgerState blk)
   -> ChainSelEnv m blk
   -> NonEmpty (ChainDiff (Header blk))
   -> m (Maybe (ValidatedChainDiff (Header blk) (LedgerDB' blk)))
@@ -1063,7 +1063,7 @@ ledgerValidateCandidate
      , LedgerSupportsProtocol blk
      , HasCallStack
      )
-  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  => LedgerEventHandler m (ExtLedgerState blk)
   -> ChainSelEnv m blk
   -> ChainDiff (Header blk)
   -> m (ValidatedChainDiff (Header blk) (LedgerDB' blk))
@@ -1225,7 +1225,7 @@ validateCandidate
      , LedgerSupportsProtocol blk
      , HasCallStack
      )
-  => (AuxLedgerEvent (ExtLedgerState blk) -> m ())
+  => LedgerEventHandler m (ExtLedgerState blk)
   -> ChainSelEnv m blk
   -> ChainDiff (Header blk)
   -> m (ValidationResult blk)
