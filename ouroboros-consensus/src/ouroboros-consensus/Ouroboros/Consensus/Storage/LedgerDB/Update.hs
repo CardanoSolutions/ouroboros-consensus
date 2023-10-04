@@ -116,7 +116,7 @@ toRealPoint (Weaken ap)      = toRealPoint ap
 -- We take in the entire 'LedgerDB' because we record that as part of errors.
 applyBlock :: forall m c l blk. (ApplyBlock l blk, Monad m, c)
            => LedgerCfg l
-           -> LedgerEventHandler m l
+           -> LedgerEventHandler m l blk
            -> Ap m l blk c
            -> LedgerDB l -> m l
 applyBlock cfg eventHandler@LedgerEventHandler{handleLedgerEvent} ap db = case ap of
@@ -128,9 +128,10 @@ applyBlock cfg eventHandler@LedgerEventHandler{handleLedgerEvent} ap db = case a
         tickThenApplyLedgerResult cfg b l
       forM_ (lrEvents result) $
         handleLedgerEvent
-          (headerPrevHash b) -- TODO This line doesn't work with: "Reduction stack overflow; size = 201"
+          (headerPrevHash $ getHeader b)
           (headerFieldHash $ getHeaderFields b)
           (headerFieldSlot $ getHeaderFields b)
+          (headerFieldBlockNo $ getHeaderFields b)
       return (lrResult result)
     ReapplyRef r  -> do
       b <- doResolveBlock r
@@ -302,7 +303,7 @@ data ExceededRollback = ExceededRollback {
 
 ledgerDbPush :: forall m c l blk. (ApplyBlock l blk, Monad m, c)
              => LedgerDbCfg l
-             -> LedgerEventHandler m l
+             -> LedgerEventHandler m l blk
              -> Ap m l blk c -> LedgerDB l -> m (LedgerDB l)
 ledgerDbPush cfg handleLedgerEvent ap db =
     (\current' -> pushLedgerState (ledgerDbCfgSecParam cfg) current' db) <$>
@@ -312,7 +313,7 @@ ledgerDbPush cfg handleLedgerEvent ap db =
 ledgerDbPushMany ::
      forall m c l blk . (ApplyBlock l blk, Monad m, c)
   => (Pushing blk -> m ())
-  -> LedgerEventHandler m l
+  -> LedgerEventHandler m l blk
   -> LedgerDbCfg l
   -> [Ap m l blk c] -> LedgerDB l -> m (LedgerDB l)
 ledgerDbPushMany trace handleLedgerEvent cfg aps initDb = (repeatedlyM pushAndTrace) aps initDb
@@ -325,7 +326,7 @@ ledgerDbPushMany trace handleLedgerEvent cfg aps initDb = (repeatedlyM pushAndTr
 -- | Switch to a fork
 ledgerDbSwitch :: (ApplyBlock l blk, Monad m, c)
                => LedgerDbCfg l
-               -> LedgerEventHandler m l
+               -> LedgerEventHandler m l blk
                -> Word64          -- ^ How many blocks to roll back
                -> (UpdateLedgerDbTraceEvent blk -> m ())
                -> [Ap m l blk c]  -- ^ New blocks to apply
@@ -344,7 +345,7 @@ ledgerDbSwitch cfg handleLedgerEvent numRollbacks trace newBlocks db =
         (firstBlock:_) -> do
           let start   = PushStart . toRealPoint $ firstBlock
               goal    = PushGoal  . toRealPoint . last $ newBlocks
-          Right <$> ledgerDbPushMany (trace . (StartedPushingBlockToTheLedgerDb start goal))
+          Right <$> ledgerDbPushMany (trace . StartedPushingBlockToTheLedgerDb start goal)
                                      handleLedgerEvent
                                      cfg
                                      newBlocks
