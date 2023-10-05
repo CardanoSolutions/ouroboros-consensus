@@ -185,7 +185,7 @@ data RunNodeArgs m addrNTN addrNTC blk (p2p :: Diffusion.P2P) = RunNodeArgs {
     , rnPeerSharing :: PeerSharing
 
       -- | An event handler to trigger custom action when ledger events are emitted.
-    , rnHandleLedgerEvent :: LedgerEventHandler m (ExtLedgerState blk)
+    , rnHandleLedgerEvent :: LedgerEventHandler m (ExtLedgerState blk) blk
     }
 
 -- | Arguments that usually only tests /directly/ specify.
@@ -594,7 +594,7 @@ stdWithCheckedDB pb databasePath networkMagic body = do
 
 openChainDB
   :: forall m blk. (RunNode blk, IOLike m)
-  => LedgerEventHandler m (ExtLedgerState blk)
+  => LedgerEventHandler m (ExtLedgerState blk) blk
   -> ResourceRegistry m
   -> CheckInFuture m blk
   -> TopLevelConfig blk
