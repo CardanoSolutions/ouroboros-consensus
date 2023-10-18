@@ -146,7 +146,7 @@ library
     , sop-core                      ^>=0.5
     , sop-extras                    ^>=0.1
     , strict-sop-core               ^>=0.1
-    , text                          ^>=2.0
+    , text                          ^>=1.2
     , these                         ^>=1.2
     , vector-map
 

@@ -275,7 +275,7 @@ library
     , strict-checked-vars          ^>=0.1.0.4
     , strict-sop-core              ^>=0.1
     , strict-stm                   ^>=1.2
-    , text                         ^>=2.0
+    , text                         ^>=1.2
     , these                        ^>=1.2
     , time
     , transformers
