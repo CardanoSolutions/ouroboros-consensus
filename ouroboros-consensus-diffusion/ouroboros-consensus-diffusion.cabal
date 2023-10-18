@@ -119,7 +119,7 @@ library
     , random
     , serialise                    ^>=0.2
     , si-timers                    ^>=1.1
-    , text                         ^>=2.0
+    , text                         ^>=1.2
     , time
     , transformers
     , typed-protocols
