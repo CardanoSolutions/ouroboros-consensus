@@ -175,7 +175,7 @@ newtype LedgerEventHandler m l blk =
   LedgerEventHandler
     { handleLedgerEvent
         :: ChainHash blk -- Previous block header hash
-        -> HeaderHash l -- Block header hash of the applied block
+        -> HeaderHash blk -- Block header hash of the applied block
         -> SlotNo -- Slot number of the applied block
         -> BlockNo -- Applied block number
         -> [AuxLedgerEvent l] -- Resulting 'AuxLedgerEvent's after applying `applyBlock`.
