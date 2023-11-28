@@ -182,6 +182,12 @@ newtype LedgerEventHandler m l blk =
         -> m ()
     }
 
+instance Applicative m => Semigroup (LedgerEventHandler m l blk) where
+  (LedgerEventHandler x) <> (LedgerEventHandler y) =
+    LedgerEventHandler $ \p h s b es -> x p h s b es *> y p h s b es
+instance Applicative m => Monoid (LedgerEventHandler m l blk) where
+  mempty = discardEvent
+
 natHandler :: (m () -> n ()) -> LedgerEventHandler m l blk -> LedgerEventHandler n l blk
 natHandler nat LedgerEventHandler{handleLedgerEvent} = LedgerEventHandler (\ph h s bn -> nat . handleLedgerEvent ph h s bn)
 
