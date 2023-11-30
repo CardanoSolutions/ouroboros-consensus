@@ -338,7 +338,7 @@ forkBlockForging IS{..} blockForging =
         -- 'ExtLedgerState'.
         let tickedChainDepState :: Ticked (ChainDepState (BlockProtocol blk))
             tickedChainDepState =
-                tickChainDepState
+                crResult $ tickChainDepState
                   (configConsensus cfg)
                   ledgerView
                   currentSlot

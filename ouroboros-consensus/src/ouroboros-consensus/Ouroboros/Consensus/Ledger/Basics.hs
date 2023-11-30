@@ -129,9 +129,13 @@ class ( -- Requirements on the ledger state itself
   -- | Event emitted by the ledger
   --
   -- TODO we call this 'AuxLedgerEvent' to differentiate from 'LedgerEvent' in
-  -- 'InspectLedger'. When that module is rewritten to make use of ledger
+  -- 'InspectLmport           Cardano.Ledger.BaseTypes (Nonce (NeutralNonce, Nonce))
+  -- import           Cardano.Ledger.BaseTypes (Nonce (NeutralNonce, Nonce))
+  -- edger'. When that module is rewritten to make use of ledger
   -- derived events, we may rename this type.
   type family AuxLedgerEvent l :: Type
+
+  -- type family ConsensusEvent l :: Type
 
   -- | Apply "slot based" state transformations
   --

@@ -26,6 +26,7 @@ module Ouroboros.Consensus.Protocol.Praos (
   , PraosState (..)
   , PraosToSign (..)
   , PraosValidationErr (..)
+  , PraosEvent (..)
   , Ticked (..)
   , forgePraosFields
   , praosCheckCanForge
@@ -361,6 +362,8 @@ deriving instance PraosCrypto c => NoThunks (PraosValidationErr c)
 
 deriving instance PraosCrypto c => Show (PraosValidationErr c)
 
+data PraosEvent c = EpochNonce !Nonce
+
 instance PraosCrypto c => ConsensusProtocol (Praos c) where
   type ChainDepState (Praos c) = PraosState c
   type IsLeader (Praos c) = PraosIsLeader c
@@ -369,6 +372,7 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
   type LedgerView (Praos c) = Views.LedgerView c
   type ValidationErr (Praos c) = PraosValidationErr c
   type ValidateView (Praos c) = PraosValidateView c
+  type ConsensusEvent (Praos c) = PraosEvent c
 
   protocolSecurityParam = praosSecurityParam . praosParams
 
@@ -409,7 +413,7 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
     (TickedPraosLedgerView lv)
     slot
     st =
-      TickedPraosState
+      ConsensusResult events $ TickedPraosState
         { tickedPraosStateChainDepState = st',
           tickedPraosStateLedgerView = TickedPraosLedgerView lv
         }
@@ -419,16 +423,18 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
             (History.toPureEpochInfo praosEpochInfo)
             (praosStateLastSlot st)
             slot
-        st' =
+        (st', events) =
           if newEpoch
             then
-              st
-                { praosStateEpochNonce =
-                    praosStateCandidateNonce st
-                      ⭒ praosStateLastEpochBlockNonce st,
-                  praosStateLastEpochBlockNonce = praosStateLabNonce st
-                }
-            else st
+              let newState =
+                    st
+                      { praosStateEpochNonce =
+                          praosStateCandidateNonce st
+                            ⭒ praosStateLastEpochBlockNonce st,
+                        praosStateLastEpochBlockNonce = praosStateLabNonce st
+                      }
+               in (newState, [EpochNonce $ praosStateEpochNonce newState])
+            else (st, events)
 
   -- Validate and update the chain dependent state as a result of processing a
   -- new header.
@@ -473,7 +479,7 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
     b
     slot
     tcs =
-      cs
+      ConsensusResult [] $ cs
         { praosStateLastSlot = NotOrigin slot,
           praosStateLabNonce = prevHashToNonce (Views.hvPrevHash b),
           praosStateEvolvingNonce = newEvolvingNonce,

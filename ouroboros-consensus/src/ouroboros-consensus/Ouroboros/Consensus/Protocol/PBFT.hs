@@ -295,6 +295,7 @@ instance PBftCrypto c => ConsensusProtocol (PBft c) where
   type IsLeader      (PBft c) = PBftIsLeader    c
   type ChainDepState (PBft c) = PBftState       c
   type CanBeLeader   (PBft c) = PBftCanBeLeader c
+  type ConsensusEvent (PBft c) = ConsensusEvent c
 
   protocolSecurityParam = pbftSecurityParam . pbftParams
 
@@ -316,7 +317,7 @@ instance PBftCrypto c => ConsensusProtocol (PBft c) where
       PBftParams{pbftNumNodes = NumCoreNodes numCoreNodes} = pbftParams
       CoreNodeId i = pbftCanBeLeaderCoreNodeId
 
-  tickChainDepState _ lv _ = TickedPBftState lv
+  tickChainDepState _ lv _ = ConsensusResult [] . TickedPBftState lv
 
   updateChainDepState cfg
                       toValidate
@@ -324,7 +325,7 @@ instance PBftCrypto c => ConsensusProtocol (PBft c) where
                       (TickedPBftState (TickedPBftLedgerView dms) state) =
       case toValidate of
         PBftValidateBoundary ->
-          return state
+          return $ ConsensusResult [] state
         PBftValidateRegular PBftFields{..} signed contextDSIGN -> do
           -- Check that the issuer signature verifies, and that it's a delegate of a
           -- genesis key, and that genesis key hasn't voted too many times.
@@ -351,7 +352,7 @@ instance PBftCrypto c => ConsensusProtocol (PBft c) where
               let state' = append cfg params (slot, gk) state
               case pbftWindowExceedsThreshold params state' gk of
                 Left n   -> throwError $ PBftExceededSignThreshold gk n
-                Right () -> return $! state'
+                Right () -> return $! ConsensusResult [] state'
     where
       params = pbftWindowParams cfg
 
@@ -360,7 +361,7 @@ instance PBftCrypto c => ConsensusProtocol (PBft c) where
                         slot
                         (TickedPBftState (TickedPBftLedgerView dms) state) =
       case toValidate of
-        PBftValidateBoundary -> state
+        PBftValidateBoundary -> ConsensusResult [] state
         PBftValidateRegular PBftFields{pbftIssuer} _ _ ->
           case Bimap.lookupR (hashVerKey pbftIssuer) dms of
             Nothing ->
@@ -371,7 +372,7 @@ instance PBftCrypto c => ConsensusProtocol (PBft c) where
               let state' = append cfg params (slot, gk) state
               case pbftWindowExceedsThreshold params state' gk of
                 Left n   -> error $ show $ PBftExceededSignThreshold gk n
-                Right () -> state'
+                Right () -> ConsensusResult [] state'
     where
       params = pbftWindowParams cfg
 

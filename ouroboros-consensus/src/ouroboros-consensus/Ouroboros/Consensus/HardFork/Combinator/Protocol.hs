@@ -96,13 +96,17 @@ instance CanHardFork xs => ConsensusProtocol (HardForkProtocol xs) where
   type CanBeLeader   (HardForkProtocol xs) = HardForkCanBeLeader   xs
   type IsLeader      (HardForkProtocol xs) = HardForkIsLeader      xs
   type ValidateView  (HardForkProtocol xs) = OneEraValidateView    xs
+  type ConsensusEvent (HardForkProtocol xs) = () -- TODO Not sure what to put here
 
   -- Operations on the state
 
-  tickChainDepState     = tick
+  tickChainDepState cfg tickedLedgerView slotNo chainDepState =
+    ConsensusResult [] $ tick cfg tickedLedgerView slotNo chainDepState
   checkIsLeader         = check
-  updateChainDepState   = update
-  reupdateChainDepState = reupdate
+  updateChainDepState cfg tickedLedgerView slotNo chainDepState =
+    ConsensusResult [] <$> update cfg tickedLedgerView slotNo chainDepState
+  reupdateChainDepState cfg view slotNo tickedChainDepState =
+    ConsensusResult [] $ reupdate cfg view slotNo tickedChainDepState
 
   --
   -- Straight-forward extensions
@@ -177,7 +181,7 @@ tick cfg@HardForkConsensusConfig{..}
             -> WrapChainDepState              blk
             -> (Ticked :.: WrapChainDepState) blk
     tickOne cfg' (Comp ledgerView') chainDepState' = Comp $
-        WrapTickedChainDepState $
+        WrapTickedChainDepState $ crResult $
           tickChainDepState
             (completeConsensusConfig' ei cfg')
             (unwrapTickedLedgerView ledgerView')
@@ -292,7 +296,7 @@ updateEra :: forall xs blk. SingleEraBlock blk
 updateEra ei slot index cfg
           (Pair view (Comp chainDepState)) = Comp $
     withExcept (injectValidationErr index) $
-      fmap WrapChainDepState $
+      fmap (WrapChainDepState . crResult) $
         updateChainDepState
           (completeConsensusConfig' ei cfg)
           (unwrapValidateView view)
@@ -330,7 +334,7 @@ reupdateEra :: SingleEraBlock blk
             -> Product WrapValidateView (Ticked :.: WrapChainDepState) blk
             -> WrapChainDepState blk
 reupdateEra ei slot cfg (Pair view (Comp chainDepState)) =
-    WrapChainDepState $
+    WrapChainDepState $ crResult $
       reupdateChainDepState
         (completeConsensusConfig' ei cfg)
         (unwrapValidateView view)

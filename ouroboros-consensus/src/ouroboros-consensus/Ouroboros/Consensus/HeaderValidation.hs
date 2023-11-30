@@ -77,6 +77,7 @@ import           Ouroboros.Consensus.Ticked
 import           Ouroboros.Consensus.Util.Assert
 import qualified Ouroboros.Consensus.Util.CBOR as Util.CBOR
 import           Ouroboros.Network.AnchoredSeq (Anchorable (..))
+import Data.Functor ((<&>))
 
 {-------------------------------------------------------------------------------
   Preliminary: annotated tip
@@ -190,12 +191,14 @@ tickHeaderState :: ConsensusProtocol (BlockProtocol blk)
                 => ConsensusConfig (BlockProtocol blk)
                 -> Ticked (LedgerView (BlockProtocol blk))
                 -> SlotNo
-                -> HeaderState blk -> Ticked (HeaderState blk)
-tickHeaderState cfg ledgerView slot HeaderState {..} = TickedHeaderState {
-      untickedHeaderStateTip    = headerStateTip
-    , tickedHeaderStateChainDep =
-        tickChainDepState cfg ledgerView slot headerStateChainDep
-    }
+                -> HeaderState blk
+                -> ConsensusResult (BlockProtocol blk) (Ticked (HeaderState blk))
+tickHeaderState cfg ledgerView slot HeaderState {..} =
+  tickChainDepState cfg ledgerView slot headerStateChainDep <&> \tickedChainDepState -> do
+    TickedHeaderState {
+        untickedHeaderStateTip    = headerStateTip
+      , tickedHeaderStateChainDep = tickedChainDepState
+      }
 
 genesisHeaderState :: ChainDepState (BlockProtocol blk) -> HeaderState blk
 genesisHeaderState = HeaderState Origin
@@ -418,7 +421,7 @@ validateHeader :: (BlockSupportsProtocol blk, ValidateEnvelope blk)
                -> Ticked (LedgerView (BlockProtocol blk))
                -> Header blk
                -> Ticked (HeaderState blk)
-               -> Except (HeaderError blk) (HeaderState blk)
+               -> Except (HeaderError blk) (ConsensusResult (BlockProtocol blk) (HeaderState blk))
 validateHeader cfg ledgerView hdr st = do
     withExcept HeaderEnvelopeError $
       validateEnvelope
@@ -432,7 +435,7 @@ validateHeader cfg ledgerView hdr st = do
         (validateView (configBlock cfg) hdr)
         (blockSlot hdr)
         (tickedHeaderStateChainDep st)
-    return $ HeaderState (NotOrigin (getAnnTip hdr)) chainDepState'
+    return $ fmap (HeaderState (NotOrigin (getAnnTip hdr))) chainDepState'
 
 -- | Header revalidation
 --
@@ -447,14 +450,12 @@ revalidateHeader ::
   -> Ticked (LedgerView (BlockProtocol blk))
   -> Header blk
   -> Ticked (HeaderState blk)
-  -> HeaderState blk
+  -> ConsensusResult (BlockProtocol blk) (HeaderState blk)
 revalidateHeader cfg ledgerView hdr st =
     assertWithMsg envelopeCheck $
-      HeaderState
-        (NotOrigin (getAnnTip hdr))
-        chainDepState'
+      fmap (HeaderState (NotOrigin (getAnnTip hdr))) chainDepState'
   where
-    chainDepState' :: ChainDepState (BlockProtocol blk)
+    chainDepState' :: ConsensusResult (BlockProtocol blk) (ChainDepState (BlockProtocol blk))
     chainDepState' =
         reupdateChainDepState
           (configConsensus cfg)

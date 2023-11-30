@@ -1,11 +1,15 @@
-{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Ouroboros.Consensus.Protocol.Abstract (
     -- * Abstract definition of the Ouroboros protocol
     ConsensusConfig
   , ConsensusProtocol (..)
+  , ConsensusResult (..)
+  , castConsensusResult
+  , mapConsensusResultEvent
   , preferCandidate
     -- * Convenience re-exports
   , SecurityParam (..)
@@ -19,6 +23,21 @@ import           NoThunks.Class (NoThunks)
 import           Ouroboros.Consensus.Block.Abstract
 import           Ouroboros.Consensus.Config.SecurityParam
 import           Ouroboros.Consensus.Ticked
+
+data ConsensusResult p a = ConsensusResult
+  { crEvents :: [ConsensusEvent p]
+  , crResult :: !a
+  }
+  deriving (Foldable, Functor, Traversable)
+
+castConsensusResult ::
+     (ConsensusEvent p ~ ConsensusEvent p')
+  => ConsensusResult p  a
+  -> ConsensusResult p' a
+castConsensusResult (ConsensusResult x0 x1) = ConsensusResult x0 x1
+
+mapConsensusResultEvent :: (ConsensusEvent p -> ConsensusEvent p') -> ConsensusResult p a -> ConsensusResult p' a
+mapConsensusResultEvent f ConsensusResult { crEvents, crResult } = ConsensusResult (fmap f crEvents) crResult
 
 -- | Static configuration required to run the consensus protocol
 --
@@ -122,6 +141,8 @@ class ( Show (ChainDepState   p)
   -- | View on a header required to validate it
   type family ValidateView p :: Type
 
+  type family ConsensusEvent p :: Type
+
   -- | Check if a node is the leader
   checkIsLeader :: HasCallStack
                 => ConsensusConfig       p
@@ -140,7 +161,7 @@ class ( Show (ChainDepState   p)
                     -> Ticked (LedgerView p)
                     -> SlotNo
                     -> ChainDepState p
-                    -> Ticked (ChainDepState p)
+                    -> ConsensusResult p (Ticked (ChainDepState p))
 
   -- | Apply a header
   updateChainDepState :: HasCallStack
@@ -148,7 +169,7 @@ class ( Show (ChainDepState   p)
                       -> ValidateView          p
                       -> SlotNo
                       -> Ticked (ChainDepState p)
-                      -> Except (ValidationErr p) (ChainDepState p)
+                      -> Except (ValidationErr p) (ConsensusResult p (ChainDepState p))
 
   -- | Re-apply a header to the same 'ChainDepState' we have been able to
   -- successfully apply to before.
@@ -166,7 +187,7 @@ class ( Show (ChainDepState   p)
                         -> ValidateView          p
                         -> SlotNo
                         -> Ticked (ChainDepState p)
-                        -> ChainDepState         p
+                        -> ConsensusResult p (ChainDepState p)
 
   -- | We require that protocols support a @k@ security parameter
   protocolSecurityParam :: ConsensusConfig p -> SecurityParam

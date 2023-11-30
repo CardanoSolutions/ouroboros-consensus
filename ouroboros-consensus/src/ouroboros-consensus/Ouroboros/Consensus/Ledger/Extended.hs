@@ -3,8 +3,6 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns        #-}
-{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -13,12 +11,14 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE BlockArguments #-}
 
 module Ouroboros.Consensus.Ledger.Extended (
     -- * Extended ledger state
     ExtLedgerCfg (..)
   , ExtLedgerState (..)
   , ExtValidationError (..)
+  , AuxExtLedgerEvent (..)
     -- * Serialisation
   , decodeExtLedgerState
   , encodeExtLedgerState
@@ -114,26 +114,32 @@ instance IsLedger (LedgerState blk) => GetTip (ExtLedgerState blk) where
 instance IsLedger (LedgerState blk) => GetTip (Ticked (ExtLedgerState blk)) where
   getTip = castPoint . getTip . tickedLedgerState
 
+data AuxExtLedgerEvent l c =
+  AuxLedgerEvent (AuxLedgerEvent l)
+    | AuxConsensusEvent !(ConsensusEvent c)
+
 instance ( LedgerSupportsProtocol blk
          )
       => IsLedger (ExtLedgerState blk) where
   type LedgerErr (ExtLedgerState blk) = ExtValidationError blk
 
-  type AuxLedgerEvent (ExtLedgerState blk) = AuxLedgerEvent (LedgerState blk)
+  type AuxLedgerEvent (ExtLedgerState blk) = AuxExtLedgerEvent (LedgerState blk) (BlockProtocol blk)
 
-  applyChainTickLedgerResult cfg slot (ExtLedgerState ledger header) =
-      castLedgerResult ledgerResult <&> \tickedLedgerState ->
-      let tickedLedgerView :: Ticked (LedgerView (BlockProtocol blk))
-          tickedLedgerView = protocolLedgerView lcfg tickedLedgerState
+  applyChainTickLedgerResult cfg slot (ExtLedgerState ledger header) = do
+      let extLedgerResult = ledgerResult <&> \tickedLedgerState -> do
+            let tickedLedgerView :: Ticked (LedgerView (BlockProtocol blk))
+                tickedLedgerView = protocolLedgerView lcfg tickedLedgerState
 
-          tickedHeaderState :: Ticked (HeaderState blk)
-          tickedHeaderState =
-              tickHeaderState
-                (configConsensus $ getExtLedgerCfg cfg)
-                tickedLedgerView
-                slot
-                header
-      in TickedExtLedgerState {..}
+                tickedHeaderState :: Ticked (HeaderState blk)
+                tickedHeaderState = crResult $
+                    tickHeaderState
+                      (configConsensus $ getExtLedgerCfg cfg)
+                      tickedLedgerView
+                      slot
+                      header
+             in TickedExtLedgerState {..}
+      -- TODO
+      LedgerResult [] $ lrResult extLedgerResult
     where
       lcfg :: LedgerConfig blk
       lcfg = configLedger $ getExtLedgerCfg cfg
@@ -148,24 +154,31 @@ instance LedgerSupportsProtocol blk => ApplyBlock (ExtLedgerState blk) blk where
           (configLedger $ getExtLedgerCfg cfg)
           blk
           tickedLedgerState
-    hdr <-
+    consensusResult <-
         withExcept ExtValidationErrorHeader
       $ validateHeader @blk
           (getExtLedgerCfg cfg)
           tickedLedgerView
           (getHeader blk)
           tickedHeaderState
-    pure $ (\l -> ExtLedgerState l hdr) <$> castLedgerResult ledgerResult
+    let ledgerState = lrResult ledgerResult
+        headerState = crResult consensusResult
+        events = fmap AuxLedgerEvent (lrEvents ledgerResult) ++ fmap AuxConsensusEvent (crEvents consensusResult)
+    pure $
+      LedgerResult events $ ExtLedgerState ledgerState headerState
 
-  reapplyBlockLedgerResult cfg blk TickedExtLedgerState{..} =
-      (\l -> ExtLedgerState l hdr) <$> castLedgerResult ledgerResult
+  reapplyBlockLedgerResult cfg blk TickedExtLedgerState{..} = do
+      let ledgerState = lrResult ledgerResult
+          headerState = crResult consensusResult
+      LedgerResult (fmap AuxLedgerEvent (lrEvents ledgerResult))
+        $ ExtLedgerState ledgerState headerState
     where
       ledgerResult =
         reapplyBlockLedgerResult
           (configLedger $ getExtLedgerCfg cfg)
           blk
           tickedLedgerState
-      hdr      =
+      consensusResult =
         revalidateHeader
           (getExtLedgerCfg cfg)
           tickedLedgerView

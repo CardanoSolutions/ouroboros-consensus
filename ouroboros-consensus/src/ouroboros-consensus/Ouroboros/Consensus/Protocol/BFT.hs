@@ -128,6 +128,7 @@ instance BftCrypto c => ConsensusProtocol (Bft c) where
   type IsLeader      (Bft c) = ()
   type ChainDepState (Bft c) = ()
   type CanBeLeader   (Bft c) = CoreNodeId
+  type ConsensusEvent (Bft c) = ()
 
   protocolSecurityParam = bftSecurityParam . bftParams
 
@@ -149,15 +150,15 @@ instance BftCrypto c => ConsensusProtocol (Bft c) where
              (bftVerKeys Map.! expectedLeader)
              signed
              bftSignature of
-        Right () -> return ()
+        Right () -> return $ ConsensusResult [] ()
         Left err -> throwError $ BftInvalidSignature err
     where
       BftParams{..} = bftParams
       expectedLeader = CoreId $ CoreNodeId (n `mod` numCoreNodes)
       NumCoreNodes numCoreNodes = bftNumNodes
 
-  reupdateChainDepState _ _ _ _ = ()
-  tickChainDepState     _ _ _ _ = TickedTrivial
+  reupdateChainDepState _ _ _ _ = ConsensusResult [] ()
+  tickChainDepState     _ _ _ _ = ConsensusResult [] TickedTrivial
 
 instance BftCrypto c => NoThunks (ConsensusConfig (Bft c))
   -- use generic instance

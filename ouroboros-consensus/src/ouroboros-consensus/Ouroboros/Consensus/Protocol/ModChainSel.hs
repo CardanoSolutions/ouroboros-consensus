@@ -34,11 +34,15 @@ instance ( ConsensusProtocol p
     type LedgerView    (ModChainSel p s) = LedgerView    p
     type ValidationErr (ModChainSel p s) = ValidationErr p
     type ValidateView  (ModChainSel p s) = ValidateView  p
+    type ConsensusEvent (ModChainSel p s) = ConsensusEvent p
 
     checkIsLeader         = checkIsLeader         . mcsConfigP
-    tickChainDepState     = tickChainDepState     . mcsConfigP
-    updateChainDepState   = updateChainDepState   . mcsConfigP
-    reupdateChainDepState = reupdateChainDepState . mcsConfigP
+    tickChainDepState cfg tickedLedgerView slotNo chainDepState =
+      castConsensusResult $ tickChainDepState (mcsConfigP cfg) tickedLedgerView slotNo chainDepState
+    updateChainDepState cfg tickedLedgerView slotNo chainDepState   =
+      castConsensusResult <$> updateChainDepState (mcsConfigP cfg) tickedLedgerView slotNo chainDepState
+    reupdateChainDepState cfg validateView slotNo tickedChainDepState =
+      castConsensusResult $ reupdateChainDepState (mcsConfigP cfg) validateView slotNo tickedChainDepState
     protocolSecurityParam = protocolSecurityParam . mcsConfigP
 
 instance ConsensusProtocol p => NoThunks (ConsensusConfig (ModChainSel p s))

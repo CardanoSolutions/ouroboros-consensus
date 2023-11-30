@@ -131,15 +131,17 @@ validateHeader ::
   -> HeaderStateHistory blk
   -> Except (HeaderError blk) (HeaderStateHistory blk)
 validateHeader cfg ledgerView hdr history = do
-    st' <- HeaderValidation.validateHeader cfg ledgerView hdr st
+    st' <- crResult <$> HeaderValidation.validateHeader cfg ledgerView hdr st
     return $ append st' history
   where
     st :: Ticked (HeaderState blk)
-    st = tickHeaderState
-           (configConsensus cfg)
-           ledgerView
-           (blockSlot hdr)
-           (current history)
+    st =
+      crResult $
+        tickHeaderState
+             (configConsensus cfg)
+             ledgerView
+             (blockSlot hdr)
+             (current history)
 
 {-------------------------------------------------------------------------------
   Support for tests

@@ -24,6 +24,7 @@ module Ouroboros.Consensus.Protocol.TPraos (
   , TPraosState (..)
   , TPraosToSign (..)
   , TPraosValidateView
+  , TPraosEvent (..)
   , forgeTPraosFields
   , mkShelleyGlobals
   , mkTPraosParams
@@ -69,7 +70,7 @@ import qualified Ouroboros.Consensus.HardFork.History as History
 import           Ouroboros.Consensus.Protocol.Abstract
 import           Ouroboros.Consensus.Protocol.Ledger.HotKey (HotKey)
 import qualified Ouroboros.Consensus.Protocol.Ledger.HotKey as HotKey
-import           Ouroboros.Consensus.Protocol.Ledger.Util
+import qualified Ouroboros.Consensus.Protocol.Ledger.Util as LedgerUtil
 import           Ouroboros.Consensus.Protocol.Praos.Common
 import           Ouroboros.Consensus.Ticked
 import           Ouroboros.Consensus.Util.Condense
@@ -290,6 +291,8 @@ data instance Ticked (TPraosState c) = TickedChainDepState {
     , tickedTPraosStateLedgerView    :: Ticked (LedgerView (TPraos c))
     }
 
+data TPraosEvent c = EpochNonce !SL.Nonce
+
 instance SL.PraosCrypto c => ConsensusProtocol (TPraos c) where
   type ChainDepState (TPraos c) = TPraosState c
   type IsLeader      (TPraos c) = TPraosIsLeader c
@@ -298,6 +301,7 @@ instance SL.PraosCrypto c => ConsensusProtocol (TPraos c) where
   type LedgerView    (TPraos c) = SL.LedgerView c
   type ValidationErr (TPraos c) = SL.ChainTransitionError c
   type ValidateView  (TPraos c) = TPraosValidateView c
+  type ConsensusEvent (TPraos c) = TPraosEvent c
 
   protocolSecurityParam = tpraosSecurityParam . tpraosParams
 
@@ -341,7 +345,7 @@ instance SL.PraosCrypto c => ConsensusProtocol (TPraos c) where
       d          = SL.lvD lv
       asc        = tpraosLeaderF $ tpraosParams cfg
       firstSlot  =
-          firstSlotOfEpochOfSlot
+          LedgerUtil.firstSlotOfEpochOfSlot
             (History.toPureEpochInfo $ tpraosEpochInfo cfg)
             slot
       gkeys      = Map.keysSet dlgMap
@@ -359,24 +363,29 @@ instance SL.PraosCrypto c => ConsensusProtocol (TPraos c) where
                     (TickedPraosLedgerView lv)
                     slot
                     (TPraosState lastSlot st) =
-      TickedChainDepState {
+      ConsensusResult events $ TickedChainDepState {
           tickedTPraosStateChainDepState = st'
         , tickedTPraosStateLedgerView    = TickedPraosLedgerView lv
         }
     where
+      isNewEpoch =
+        LedgerUtil.isNewEpoch
+          (History.toPureEpochInfo tpraosEpochInfo)
+          lastSlot
+          slot
       st' = SL.tickChainDepState
               shelleyGlobals
               lv
-              ( isNewEpoch
-                  (History.toPureEpochInfo tpraosEpochInfo)
-                  lastSlot
-                  slot
-              )
+              isNewEpoch
               st
+      events =
+        if isNewEpoch
+           then [EpochNonce $ SL.ticknStateEpochNonce $ SL.csTickn st']
+           else []
       shelleyGlobals = mkShelleyGlobals cfg
 
   updateChainDepState cfg b slot cs =
-      TPraosState (NotOrigin slot) <$>
+      fmap (ConsensusResult []) $ TPraosState (NotOrigin slot) <$>
         SL.updateChainDepState
           shelleyGlobals
           lv
@@ -387,7 +396,7 @@ instance SL.PraosCrypto c => ConsensusProtocol (TPraos c) where
       lv = getTickedPraosLedgerView (tickedTPraosStateLedgerView cs)
 
   reupdateChainDepState cfg b slot cs =
-      TPraosState (NotOrigin slot) $
+      ConsensusResult [] $ TPraosState (NotOrigin slot) $
         SL.reupdateChainDepState
           shelleyGlobals
           lv
