@@ -50,7 +50,7 @@ import qualified Ouroboros.Consensus.Ledger.SupportsMempool as LedgerSupportsMem
 import           Ouroboros.Consensus.Ledger.SupportsProtocol
                      (LedgerSupportsProtocol (..))
 import qualified Ouroboros.Consensus.Mempool as Mempool
-import           Ouroboros.Consensus.Protocol.Abstract (LedgerView)
+import           Ouroboros.Consensus.Protocol.Abstract (ConsensusResult (..), LedgerView)
 import           Ouroboros.Consensus.Storage.ChainDB (ChainDB)
 import qualified Ouroboros.Consensus.Storage.ChainDB as ChainDB
 import           Ouroboros.Consensus.Storage.ChainDB.Impl.LgrDB
@@ -578,17 +578,18 @@ benchmarkLedgerOps mOutfile AnalysisEnv {db, registry, initLedger, cfg, limit} =
           -> Ticked (LedgerView (BlockProtocol blk))
           -> IO (Ticked (HeaderState blk))
         tickTheHeaderState slot st tickedLedgerView =
-            pure $! tickHeaderState ccfg
-                                    tickedLedgerView
-                                    slot
-                                    (headerState st)
+            pure . crResult $!
+              tickHeaderState ccfg
+              tickedLedgerView
+              slot
+              (headerState st)
 
         applyTheHeader ::
              Ticked (LedgerView (BlockProtocol blk))
           -> Ticked (HeaderState blk)
           -> IO (HeaderState blk)
         applyTheHeader tickedLedgerView tickedHeaderState = do
-            case runExcept $ validateHeader cfg tickedLedgerView (getHeader blk) tickedHeaderState of
+            case runExcept $ crResult <$> validateHeader cfg tickedLedgerView (getHeader blk) tickedHeaderState of
               Left err -> fail $ "benchmark doesn't support invalid headers: " <> show rp <> " " <> show err
               Right x -> pure x
 

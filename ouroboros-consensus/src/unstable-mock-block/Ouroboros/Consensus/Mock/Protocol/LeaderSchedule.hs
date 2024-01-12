@@ -38,12 +38,13 @@ data instance ConsensusConfig (WithLeaderSchedule p) = WLSConfig {
 instance ConsensusProtocol p => ConsensusProtocol (WithLeaderSchedule p) where
   type SelectView    (WithLeaderSchedule p) = SelectView p
 
-  type ChainDepState (WithLeaderSchedule p) = ()
-  type LedgerView    (WithLeaderSchedule p) = ()
-  type ValidationErr (WithLeaderSchedule p) = ()
-  type IsLeader      (WithLeaderSchedule p) = ()
-  type ValidateView  (WithLeaderSchedule p) = ()
-  type CanBeLeader   (WithLeaderSchedule p) = ()
+  type ChainDepState  (WithLeaderSchedule p) = ()
+  type LedgerView     (WithLeaderSchedule p) = ()
+  type ValidationErr  (WithLeaderSchedule p) = ()
+  type IsLeader       (WithLeaderSchedule p) = ()
+  type ValidateView   (WithLeaderSchedule p) = ()
+  type CanBeLeader    (WithLeaderSchedule p) = ()
+  type ConsensusEvent (WithLeaderSchedule p) = ()
 
   protocolSecurityParam = protocolSecurityParam . wlsConfigP
 
@@ -54,9 +55,9 @@ instance ConsensusProtocol p => ConsensusProtocol (WithLeaderSchedule p) where
             | wlsConfigNodeId `elem` nids -> Just ()
             | otherwise                   -> Nothing
 
-  tickChainDepState     _ _ _ _ = TickedTrivial
-  updateChainDepState   _ _ _ _ = return ()
-  reupdateChainDepState _ _ _ _ = ()
+  tickChainDepState     _ _ _ _ = ConsensusResult [] TickedTrivial
+  updateChainDepState   _ _ _ _ = return $ ConsensusResult [] ()
+  reupdateChainDepState _ _ _ _ = ConsensusResult [] ()
 
 instance ConsensusProtocol p
       => NoThunks (ConsensusConfig (WithLeaderSchedule p))

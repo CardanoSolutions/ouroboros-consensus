@@ -49,7 +49,7 @@ First, some imports we'll need:
 >    Header, StorageConfig, ChainHash, HasHeader(..), HeaderFields(..),
 >    HeaderHash, Point, StandardHash)
 > import Ouroboros.Consensus.Protocol.Abstract
->   (SecurityParam(..), ConsensusConfig, ConsensusProtocol(..) )
+>   (SecurityParam(..), ConsensusConfig, ConsensusProtocol(..), ConsensusResult(..) )
 > import Ouroboros.Consensus.Ticked ( Ticked(TickedTrivial) )
 > import Ouroboros.Consensus.Block
 >   (BlockSupportsProtocol (selectView, validateView))
@@ -129,16 +129,17 @@ simple one here:
 Next, we instantiate the `ConsensusProtocol` for `SP`:
 
 > instance ConsensusProtocol SP where
->   type SelectView    SP = BlockNo
+>   type SelectView     SP = BlockNo
 >
->   type LedgerView    SP = ()
+>   type LedgerView     SP = ()
 >
->   type IsLeader      SP = SP_IsLeader
->   type CanBeLeader   SP = SP_CanBeLeader
+>   type IsLeader       SP = SP_IsLeader
+>   type CanBeLeader    SP = SP_CanBeLeader
 >
->   type ChainDepState SP = ()
->   type ValidateView  SP = ()
->   type ValidationErr SP = Void
+>   type ChainDepState  SP = ()
+>   type ValidateView   SP = ()
+>   type ValidationErr  SP = Void
+>   type ConsensusEvent SP = Void
 >
 >   checkIsLeader cfg SP_CanBeLeader slot _tcds =
 >       if slot `Set.member` cfgsp_slotsLedByMe cfg
@@ -147,11 +148,11 @@ Next, we instantiate the `ConsensusProtocol` for `SP`:
 >
 >   protocolSecurityParam _cfg = k
 >
->   tickChainDepState _ _ _ _ = TickedTrivial
+>   tickChainDepState _ _ _ _ = ConsensusResult [] TickedTrivial
 >
->   updateChainDepState _ _ _ _ = return ()
+>   updateChainDepState _ _ _ _ = return $ ConsensusResult [] ()
 >
->   reupdateChainDepState _ _ _ _ = ()
+>   reupdateChainDepState _ _ _ _ = ConsensusResult [] ()
 
 Finally we define a few extra things used in this instantiation:
 

@@ -56,6 +56,7 @@ And imports, of course:
 
 > import Control.Monad ()
 > import Control.Monad.Except (MonadError (throwError))
+> import Data.Void (Void)
 > import Data.Word (Word64)
 > import GHC.Generics (Generic)
 > import NoThunks.Class (NoThunks, OnlyCheckWhnfNamed (..))
@@ -72,7 +73,7 @@ And imports, of course:
 > import Ouroboros.Consensus.Block.SupportsProtocol
 >   (BlockSupportsProtocol (..))
 > import Ouroboros.Consensus.Protocol.Abstract
->   (ConsensusConfig, SecurityParam, ConsensusProtocol (..))
+>   (ConsensusConfig, SecurityParam, ConsensusProtocol (..), ConsensusResult (..))
 >
 > import Ouroboros.Consensus.Ticked (Ticked)
 > import Ouroboros.Consensus.Ledger.Abstract
@@ -537,6 +538,8 @@ functions defined above:
 >
 >   type ValidationErr PrtclD = String
 >
+>   type ConsensusEvent PrtclD = Void   -- events aren't used in this example
+>
 >   -- | checkIsLeader - Am I the leader this slot?
 >   checkIsLeader cfg _cbl slot tcds =
 >     case ccpd_mbCanBeLeader cfg of
@@ -547,7 +550,7 @@ functions defined above:
 >
 >   protocolSecurityParam = ccpd_securityParam
 >
->   tickChainDepState _cfg tlv _slot _cds = TickedChainDepStateD lv
+>   tickChainDepState _cfg tlv _slot _cds = ConsensusResult [] $ TickedChainDepStateD lv
 >     where
 >       TickedLedgerViewD lv = tlv
 >
@@ -559,11 +562,11 @@ functions defined above:
 >
 >   updateChainDepState _cfg hdrVw slot tcds =
 >     if isLeader hdrVw slot (tickedChainDepLV tcds) then
->       return ChainDepStateD
+>       return $ ConsensusResult [] ChainDepStateD
 >     else
 >       throwError $ "leader check failed: " ++ show (hdrVw,slot)
 >
->   reupdateChainDepState _ _ _ _ = ChainDepStateD
+>   reupdateChainDepState _ _ _ _ = ConsensusResult [] ChainDepStateD
 
 Integration
 ===========

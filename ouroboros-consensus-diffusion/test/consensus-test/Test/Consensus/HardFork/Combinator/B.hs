@@ -87,12 +87,13 @@ data instance ConsensusConfig ProtocolB = CfgB {
   deriving NoThunks via OnlyCheckWhnfNamed "CfgB" (ConsensusConfig ProtocolB)
 
 instance ConsensusProtocol ProtocolB where
-  type ChainDepState ProtocolB = ()
-  type LedgerView    ProtocolB = ()
-  type IsLeader      ProtocolB = ()
-  type CanBeLeader   ProtocolB = ()
-  type ValidateView  ProtocolB = ()
-  type ValidationErr ProtocolB = Void
+  type ChainDepState  ProtocolB = ()
+  type LedgerView     ProtocolB = ()
+  type IsLeader       ProtocolB = ()
+  type CanBeLeader    ProtocolB = ()
+  type ValidateView   ProtocolB = ()
+  type ValidationErr  ProtocolB = Void
+  type ConsensusEvent ProtocolB = Void
 
   checkIsLeader CfgB{..} () slot _ =
       if slot `Set.member` cfgB_leadInSlots
@@ -101,9 +102,9 @@ instance ConsensusProtocol ProtocolB where
 
   protocolSecurityParam = cfgB_k
 
-  tickChainDepState     _ _ _ _ = TickedTrivial
-  updateChainDepState   _ _ _ _ = return ()
-  reupdateChainDepState _ _ _ _ = ()
+  tickChainDepState     _ _ _ _ = ConsensusResult [] TickedTrivial
+  updateChainDepState   _ _ _ _ = return $ ConsensusResult [] ()
+  reupdateChainDepState _ _ _ _ = ConsensusResult [] ()
 
 data BlockB = BlkB {
       blkB_header :: Header BlockB

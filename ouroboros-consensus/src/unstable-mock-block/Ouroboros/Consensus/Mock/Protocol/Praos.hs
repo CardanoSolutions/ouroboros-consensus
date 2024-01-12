@@ -444,12 +444,13 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
 
   protocolSecurityParam = praosSecurityParam . praosParams
 
-  type LedgerView    (Praos c) = ()
-  type IsLeader      (Praos c) = PraosProof           c
-  type ValidationErr (Praos c) = PraosValidationError c
-  type ValidateView  (Praos c) = PraosValidateView    c
-  type ChainDepState (Praos c) = PraosChainDepState   c
-  type CanBeLeader   (Praos c) = CoreNodeId
+  type LedgerView     (Praos c) = ()
+  type IsLeader       (Praos c) = PraosProof           c
+  type ValidationErr  (Praos c) = PraosValidationError c
+  type ValidateView   (Praos c) = PraosValidateView    c
+  type ChainDepState  (Praos c) = PraosChainDepState   c
+  type CanBeLeader    (Praos c) = CoreNodeId
+  type ConsensusEvent (Praos c) = ()
 
   checkIsLeader cfg@PraosConfig{..} nid slot (TickedPraosChainDepState _u  cds) =
       -- See Figure 4 of the Praos paper.
@@ -466,7 +467,7 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
       rho = evalCertified () rho' praosSignKeyVRF
       y   = evalCertified () y'   praosSignKeyVRF
 
-  tickChainDepState _ lv _ = TickedPraosChainDepState lv
+  tickChainDepState _ lv _ = ConsensusResult [] . TickedPraosChainDepState lv
 
   updateChainDepState cfg@PraosConfig{..}
                       (PraosValidateView PraosFields{..} toSign)
@@ -529,7 +530,7 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
             , biRho   = praosRho
             }
 
-    return $ PraosChainDepState $ bi : praosHistory cds
+    return $ ConsensusResult [] $ PraosChainDepState $ bi : praosHistory cds
 
   reupdateChainDepState _
                         (PraosValidateView PraosFields{..} _)
@@ -540,7 +541,7 @@ instance PraosCrypto c => ConsensusProtocol (Praos c) where
             { biSlot  = slot
             , biRho   = praosRho
             }
-    in PraosChainDepState $ bi : praosHistory cds
+    in ConsensusResult [] $ PraosChainDepState $ bi : praosHistory cds
 
   -- (Standard) Praos uses the standard chain selection rule, so no need to
   -- override (though see note regarding clock skew).
