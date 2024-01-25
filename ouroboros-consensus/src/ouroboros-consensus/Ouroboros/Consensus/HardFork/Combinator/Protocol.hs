@@ -96,7 +96,7 @@ instance CanHardFork xs => ConsensusProtocol (HardForkProtocol xs) where
   type CanBeLeader    (HardForkProtocol xs) = HardForkCanBeLeader   xs
   type IsLeader       (HardForkProtocol xs) = HardForkIsLeader      xs
   type ValidateView   (HardForkProtocol xs) = OneEraValidateView    xs
-  type ConsensusEvent (HardForkProtocol xs) = () -- TODO Not sure what to put here
+  type ConsensusEvent (HardForkProtocol xs) = OneEraConsensusEvent  xs
 
   -- Operations on the state
 

@@ -9,6 +9,7 @@ module Ouroboros.Consensus.TypeFamilyWrappers (
     -- * Block based
     WrapApplyTxErr (..)
   , WrapCannotForge (..)
+  , WrapConsensusEvent (..)
   , WrapEnvelopeErr (..)
   , WrapForgeStateInfo (..)
   , WrapForgeStateUpdateError (..)
@@ -53,6 +54,7 @@ import           Ouroboros.Consensus.Protocol.Abstract
 
 newtype WrapApplyTxErr            blk = WrapApplyTxErr            { unwrapApplyTxErr            :: ApplyTxErr                  blk  }
 newtype WrapCannotForge           blk = WrapCannotForge           { unwrapCannotForge           :: CannotForge                 blk  }
+newtype WrapConsensusEvent        blk = WrapConsensusEvent        { unwrapConsensusEvent        :: ConsensusEvent              blk  }
 newtype WrapEnvelopeErr           blk = WrapEnvelopeErr           { unwrapEnvelopeErr           :: OtherHeaderEnvelopeError    blk  }
 newtype WrapForgeStateInfo        blk = WrapForgeStateInfo        { unwrapForgeStateInfo        :: ForgeStateInfo              blk  }
 newtype WrapForgeStateUpdateError blk = WrapForgeStateUpdateError { unwrapForgeStateUpdateError :: ForgeStateUpdateError       blk  }

@@ -32,6 +32,7 @@ module Ouroboros.Consensus.HardFork.Combinator.AcrossEras (
   , OneEraApplyTxErr (..)
   , OneEraBlock (..)
   , OneEraCannotForge (..)
+  , OneEraConsensusEvent (..)
   , OneEraEnvelopeErr (..)
   , OneEraForgeStateInfo (..)
   , OneEraForgeStateUpdateError (..)
@@ -119,6 +120,7 @@ newtype SomeErasCanBeLeader xs = SomeErasCanBeLeader { getSomeErasCanBeLeader ::
 newtype OneEraApplyTxErr            xs = OneEraApplyTxErr            { getOneEraApplyTxErr            :: NS WrapApplyTxErr            xs }
 newtype OneEraBlock                 xs = OneEraBlock                 { getOneEraBlock                 :: NS I                         xs }
 newtype OneEraCannotForge           xs = OneEraCannotForge           { getOneEraCannotForge           :: NS WrapCannotForge           xs }
+newtype OneEraConsensusEvent        xs = OneEraConsensusEvent        { getOneEraConsensusEvent        :: NS WrapConsensusEvent        xs }
 newtype OneEraEnvelopeErr           xs = OneEraEnvelopeErr           { getOneEraEnvelopeErr           :: NS WrapEnvelopeErr           xs }
 newtype OneEraForgeStateInfo        xs = OneEraForgeStateInfo        { getOneEraForgeStateInfo        :: NS WrapForgeStateInfo        xs }
 newtype OneEraForgeStateUpdateError xs = OneEraForgeStateUpdateError { getOneEraForgeStateUpdateError :: NS WrapForgeStateUpdateError xs }
