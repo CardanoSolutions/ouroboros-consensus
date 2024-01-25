@@ -89,13 +89,13 @@ mkHardForkSelectView bno view =
 type HardForkChainDepState xs = HardForkState WrapChainDepState xs
 
 instance CanHardFork xs => ConsensusProtocol (HardForkProtocol xs) where
-  type ChainDepState (HardForkProtocol xs) = HardForkChainDepState xs
-  type ValidationErr (HardForkProtocol xs) = HardForkValidationErr xs
-  type SelectView    (HardForkProtocol xs) = HardForkSelectView    xs
-  type LedgerView    (HardForkProtocol xs) = HardForkLedgerView    xs
-  type CanBeLeader   (HardForkProtocol xs) = HardForkCanBeLeader   xs
-  type IsLeader      (HardForkProtocol xs) = HardForkIsLeader      xs
-  type ValidateView  (HardForkProtocol xs) = OneEraValidateView    xs
+  type ChainDepState  (HardForkProtocol xs) = HardForkChainDepState xs
+  type ValidationErr  (HardForkProtocol xs) = HardForkValidationErr xs
+  type SelectView     (HardForkProtocol xs) = HardForkSelectView    xs
+  type LedgerView     (HardForkProtocol xs) = HardForkLedgerView    xs
+  type CanBeLeader    (HardForkProtocol xs) = HardForkCanBeLeader   xs
+  type IsLeader       (HardForkProtocol xs) = HardForkIsLeader      xs
+  type ValidateView   (HardForkProtocol xs) = OneEraValidateView    xs
   type ConsensusEvent (HardForkProtocol xs) = () -- TODO Not sure what to put here
 
   -- Operations on the state

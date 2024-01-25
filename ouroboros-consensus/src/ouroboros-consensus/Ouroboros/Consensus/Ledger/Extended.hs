@@ -114,9 +114,9 @@ instance IsLedger (LedgerState blk) => GetTip (ExtLedgerState blk) where
 instance IsLedger (LedgerState blk) => GetTip (Ticked (ExtLedgerState blk)) where
   getTip = castPoint . getTip . tickedLedgerState
 
-data AuxExtLedgerEvent l c =
-  AuxLedgerEvent (AuxLedgerEvent l)
-    | AuxConsensusEvent !(ConsensusEvent c)
+data AuxExtLedgerEvent l c
+  = AuxLedgerEvent (AuxLedgerEvent l)
+  | AuxConsensusEvent !(ConsensusEvent c)
 
 instance ( LedgerSupportsProtocol blk
          )
