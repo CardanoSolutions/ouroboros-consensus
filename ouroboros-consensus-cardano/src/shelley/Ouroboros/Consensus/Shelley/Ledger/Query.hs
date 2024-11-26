@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -22,6 +23,7 @@ module Ouroboros.Consensus.Shelley.Ledger.Query (
   , NonMyopicMemberRewards (..)
   , StakeSnapshot (..)
   , StakeSnapshots (..)
+  , Snapshot (..)
   , querySupportedVersion
     -- * Serialisation
   , decodeShelleyQuery
@@ -30,8 +32,10 @@ module Ouroboros.Consensus.Shelley.Ledger.Query (
   , encodeShelleyResult
   ) where
 
+import           Cardano.Ledger.Binary(EncCBOR(..), DecCBOR(..), toPlainEncoding, toPlainDecoder)
 import           Cardano.Binary (FromCBOR (..), ToCBOR (..), encodeListLen,
                      enforceSize)
+import qualified Cardano.Ledger.Coin as Coin
 import qualified Cardano.Ledger.Api.State.Query as SL
 import           Cardano.Ledger.CertState (lookupDepositDState)
 import qualified Cardano.Ledger.CertState as SL
@@ -221,7 +225,7 @@ data instance BlockQuery (ShelleyBlock proto era) :: Type -> Type where
   GetStakeSnapshots
     :: Maybe (Set (SL.KeyHash 'SL.StakePool (EraCrypto era)))
     -> BlockQuery (ShelleyBlock proto era)
-                  (StakeSnapshots (EraCrypto era))
+                  (Snapshot (EraCrypto era))
 
   GetPoolDistr
     :: Maybe (Set (SL.KeyHash 'SL.StakePool (EraCrypto era)))
@@ -389,55 +393,10 @@ instance (ShelleyCompatible proto era, ProtoCrypto proto ~ crypto)
                 , SL.psDeposits = Map.restrictKeys (SL.psDeposits certPState) poolIds
                 }
             Nothing -> certPState
-        GetStakeSnapshots mPoolIds ->
-          let SL.SnapShots
-                { SL.ssStakeMark
-                , SL.ssStakeSet
-                , SL.ssStakeGo
-                } = SL.esSnapshots . SL.nesEs $ st
 
-              totalMarkByPoolId :: Map (KeyHash 'StakePool crypto) Coin
-              totalMarkByPoolId = SL.sumStakePerPool (SL.ssDelegations ssStakeMark) (SL.ssStake ssStakeMark)
-
-              totalSetByPoolId :: Map (KeyHash 'StakePool crypto) Coin
-              totalSetByPoolId = SL.sumStakePerPool (SL.ssDelegations ssStakeSet) (SL.ssStake ssStakeSet)
-
-              totalGoByPoolId :: Map (KeyHash 'StakePool crypto) Coin
-              totalGoByPoolId = SL.sumStakePerPool (SL.ssDelegations ssStakeGo) (SL.ssStake ssStakeGo)
-
-              getPoolStakes :: Set (KeyHash 'StakePool crypto) -> Map (KeyHash 'StakePool crypto) (StakeSnapshot crypto)
-              getPoolStakes poolIds = Map.fromSet mkStakeSnapshot poolIds
-                where mkStakeSnapshot poolId = StakeSnapshot
-                        { ssMarkPool = Map.findWithDefault mempty poolId totalMarkByPoolId
-                        , ssSetPool  = Map.findWithDefault mempty poolId totalSetByPoolId
-                        , ssGoPool   = Map.findWithDefault mempty poolId totalGoByPoolId
-                        }
-
-              getAllStake :: SL.SnapShot crypto -> SL.Coin
-              getAllStake (SL.SnapShot stake _ _) = VMap.foldMap fromCompact (SL.unStake stake)
-          in
-
-          case mPoolIds of
-            Nothing ->
-              let poolIds = Set.fromList $ mconcat
-                    [ VMap.elems (SL.ssDelegations ssStakeMark)
-                    , VMap.elems (SL.ssDelegations ssStakeSet)
-                    , VMap.elems (SL.ssDelegations ssStakeGo)
-                    ]
-              in
-              StakeSnapshots
-                { ssStakeSnapshots = getPoolStakes poolIds
-                , ssMarkTotal      = getAllStake ssStakeMark
-                , ssSetTotal       = getAllStake ssStakeSet
-                , ssGoTotal        = getAllStake ssStakeGo
-                }
-            Just poolIds ->
-              StakeSnapshots
-                { ssStakeSnapshots = getPoolStakes poolIds
-                , ssMarkTotal      = getAllStake ssStakeMark
-                , ssSetTotal       = getAllStake ssStakeSet
-                , ssGoTotal        = getAllStake ssStakeGo
-                }
+        GetStakeSnapshots _mPoolIds ->
+          let SL.SnapShots { SL.ssStakeMark } = SL.esSnapshots . SL.nesEs $ st
+          in fromLedgerSnapshot ssStakeMark
 
         GetPoolDistr mPoolIds ->
           let stakeSet = SL.ssStakeSet . SL.esSnapshots $ getEpochState st in
@@ -1003,6 +962,50 @@ currentPParamsEnDecoding v
   = (toCBOR, fromCBOR)
   | otherwise
   = (encodeLegacyPParams, decodeLegacyPParams)
+
+data Snapshot c = Snapshot
+  { ssStake :: !(Map (SL.Credential 'Staking c) SL.Coin)
+  , ssDelegations :: !(Map (SL.Credential 'Staking c) (SL.KeyHash 'StakePool c))
+  , ssPoolParams :: !(Map (SL.KeyHash 'StakePool c) (SL.PoolParams c))
+  }
+  deriving (Show, Eq, Generic)
+
+instance
+  Crypto crypto =>
+  ToCBOR (Snapshot crypto)
+  where
+  toCBOR
+    Snapshot
+    { ssStake
+    , ssDelegations
+    , ssPoolParams
+    } = encodeListLen 3
+      <> toCBOR ssStake
+      <> toCBOR ssDelegations
+      <> toPlainEncoding maxBound (encCBOR ssPoolParams)
+
+instance
+  Crypto crypto =>
+  FromCBOR (Snapshot crypto)
+  where
+  fromCBOR = do
+    enforceSize "Snapshot" 3
+    Snapshot
+      <$> fromCBOR
+      <*> fromCBOR
+      <*> toPlainDecoder maxBound decCBOR
+
+fromLedgerSnapshot :: SL.SnapShot c -> Snapshot c
+fromLedgerSnapshot s =
+  Snapshot
+    { ssStake = Map.union
+        (Map.fromList $ (, SL.Coin 0) <$> VMap.keys stake)
+        (Map.map (SL.Coin . toInteger . Coin.unCompactCoin) $ VMap.toMap stake)
+    , ssDelegations = VMap.toMap (SL.ssDelegations s)
+    , ssPoolParams = VMap.toMap (SL.ssPoolParams s)
+    }
+ where
+  stake = SL.unStake (SL.ssStake s)
 
 -- | The stake snapshot returns information about the mark, set, go ledger snapshots for a pool,
 -- plus the total active stake for each snapshot that can be used in a 'sigma' calculation.
