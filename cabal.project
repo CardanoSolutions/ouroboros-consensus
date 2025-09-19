@@ -64,3 +64,20 @@ if impl (ghc >= 9.12)
 
     -- https://github.com/kapralVV/Unique/issues/11
     , Unique:hashable
+
+-- ouroboros-network patched with NodeToClientV_21 declared for GetDRepsDelegations query.
+source-repository-package
+  type: git
+  location: https://github.com/CardanoSolutions/ouroboros-network.git
+  tag: d3477c4e6b3243f89afb974914ea423a75873fa0
+  subdir:
+    ouroboros-network-api
+
+-- cardano-ledger with queryDRepDelegations backported on top of conway-1.19.0.0 (instead of 1.20.0.0).
+source-repository-package
+  type: git
+  location: https://github.com/CardanoSolutions/cardano-ledger.git
+  tag: 5cca15a1f0629c11e8d4d4daeb73428684f9c34f
+  subdir:
+    libs/cardano-ledger-core
+    libs/cardano-ledger-api

@@ -336,6 +336,12 @@ data instance BlockQuery (ShelleyBlock proto era) fp result where
     => KeyHash 'StakePool
     -> BlockQuery (ShelleyBlock proto era) QFNoTables CG.DefaultVote
 
+  GetDRepDelegations
+    :: Set SL.DRep
+    -> BlockQuery (ShelleyBlock proto era)
+                  QFNoTables
+                  (Map SL.DRep (Set (SL.Credential 'SL.Staking)))
+
   -- WARNING: please add new queries to the end of the list and stick to this
   -- order in all other pattern matches on queries. This helps in particular
   -- with the en/decoders, as we want the CBOR tags to be ordered.
@@ -503,6 +509,8 @@ instance ( ShelleyCompatible proto era
           in LedgerPeerSnapshot (slot, bigLedgerPeers)
         QueryStakePoolDefaultVote stakePool ->
           SL.queryStakePoolDefaultVote st stakePool
+        GetDRepDelegations dreps ->
+          SL.queryDRepDelegations st dreps
     where
       lcfg    = configLedger $ getExtLedgerCfg cfg
       globals = shelleyLedgerGlobals lcfg
@@ -559,6 +567,7 @@ instance ( ShelleyCompatible proto era
     GetFuturePParams {}                        -> (>= v10)
     GetBigLedgerPeerSnapshot                   -> (>= v11)
     QueryStakePoolDefaultVote {}               -> (>= v12)
+    GetDRepDelegations {}                      -> (>= v13)
     -- WARNING: when adding a new query, a new @ShelleyNodeToClientVersionX@
     -- must be added. See #2830 for a template on how to do this.
    where
@@ -567,6 +576,7 @@ instance ( ShelleyCompatible proto era
     v10 = ShelleyNodeToClientVersion10
     v11 = ShelleyNodeToClientVersion11
     v12 = ShelleyNodeToClientVersion12
+    v13 = ShelleyNodeToClientVersion13
 
 instance SameDepIndex2 (BlockQuery (ShelleyBlock proto era)) where
   sameDepIndex2 GetLedgerTip GetLedgerTip
@@ -719,6 +729,10 @@ instance SameDepIndex2 (BlockQuery (ShelleyBlock proto era)) where
   sameDepIndex2 GetBigLedgerPeerSnapshot _ = Nothing
   sameDepIndex2 QueryStakePoolDefaultVote{} QueryStakePoolDefaultVote{} = Just Refl
   sameDepIndex2 QueryStakePoolDefaultVote{} _ = Nothing
+  sameDepIndex2 (GetDRepDelegations dreps) (GetDRepDelegations dreps')
+    | dreps == dreps' = Just Refl
+    | otherwise = Nothing
+  sameDepIndex2 GetDRepDelegations{} _ = Nothing
 
 deriving instance Eq   (BlockQuery (ShelleyBlock proto era) fp result)
 deriving instance Show (BlockQuery (ShelleyBlock proto era) fp result)
@@ -761,6 +775,7 @@ instance ShelleyCompatible proto era => ShowQuery (BlockQuery (ShelleyBlock prot
       GetFuturePParams {}                        -> show
       GetBigLedgerPeerSnapshot                   -> show
       QueryStakePoolDefaultVote {}               -> show
+      GetDRepDelegations {}                      -> show
 
 {-------------------------------------------------------------------------------
   Auxiliary
@@ -878,6 +893,8 @@ encodeShelleyQuery query = case query of
       CBOR.encodeListLen 1 <> CBOR.encodeWord8 34
     QueryStakePoolDefaultVote stakePoolKey ->
       CBOR.encodeListLen 2 <> CBOR.encodeWord8 35 <> LC.toEraCBOR @era stakePoolKey
+    GetDRepDelegations dreps ->
+      CBOR.encodeListLen 2 <> CBOR.encodeWord8 36 <> LC.toEraCBOR @era dreps
 
 decodeShelleyQuery ::
      forall era proto. ShelleyBasedEra era
@@ -941,6 +958,7 @@ decodeShelleyQuery = do
       (1, 33) -> requireCG $ return $ SomeBlockQuery GetFuturePParams
       (1, 34) ->             return $ SomeBlockQuery GetBigLedgerPeerSnapshot
       (2, 35) -> requireCG $ SomeBlockQuery . QueryStakePoolDefaultVote <$> LC.fromEraCBOR @era
+      (2, 36) ->             SomeBlockQuery . GetDRepDelegations <$> LC.fromEraCBOR @era
       _       -> failmsg "invalid"
 
 encodeShelleyResult ::
@@ -984,6 +1002,7 @@ encodeShelleyResult _v query = case query of
     GetFuturePParams {}                        -> LC.toEraCBOR @era
     GetBigLedgerPeerSnapshot                   -> toCBOR
     QueryStakePoolDefaultVote {}               -> toCBOR
+    GetDRepDelegations {}                      -> LC.toEraCBOR @era
 
 decodeShelleyResult ::
      forall proto era fp result. ShelleyCompatible proto era
@@ -1027,6 +1046,7 @@ decodeShelleyResult _v query = case query of
     GetFuturePParams {}                        -> LC.fromEraCBOR @era
     GetBigLedgerPeerSnapshot                   -> fromCBOR
     QueryStakePoolDefaultVote {}               -> fromCBOR
+    GetDRepDelegations {}                      -> LC.fromEraCBOR @era
 
 -- | The stake snapshot returns information about the mark, set, go ledger snapshots for a pool,
 -- plus the total active stake for each snapshot that can be used in a 'sigma' calculation.
